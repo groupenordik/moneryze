@@ -78,6 +78,7 @@ const format = (data, sanitize = true) => {
   const kountResult = fe(data.KountResult);
   const kountScore = fe(data.KountScore);
   const kountTransactionId = fe(data.KountTransactionId);
+  const preloadTicket = fe(data.PreloadTicket);
 
   if (reference && reference !== 'null') {
     o.reference = reference;
@@ -158,6 +159,11 @@ const format = (data, sanitize = true) => {
   }
   if (kountTransactionId && kountTransactionId !== 'null') {
     o.kountTransactionId = kountTransactionId;
+  }
+
+  // Apple Pay Preload Ticket
+  if (preloadTicket && preloadTicket !== 'null') {
+    o.preloadTicket = preloadTicket;
   }
 
   return {
@@ -290,3 +296,5 @@ module.exports.preauth = (data, configuration = config) => send(data, 'preauth',
 module.exports.independentRefundWithVault = (data, configuration = config) => send(data, 'res_ind_refund_cc', configuration);
 module.exports.kountInquire = (data, configuration = config) => send(data, 'kount_inquiry', configuration);
 module.exports.kountUpdate = (data, configuration = config) => send(data, 'kount_update', configuration);
+module.exports.resTokenizeCC = (data, configuration = config) => send(data, 'res_tokenize_cc', configuration);
+module.exports.applePayPreload = (data, configuration = config) => send(data, 'applepay_preload', configuration);
