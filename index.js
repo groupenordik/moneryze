@@ -62,129 +62,73 @@ const normalizeExpiry = (format, expiry) => {
 };
 
 const format = (data, sanitize = true) => {
-  const o = {};
-  const reference = fe(data.ReferenceNum);
-  const dataKey = fe(data.DataKey);
-  const iso = fe(data.ISO);
-  const receipt = fe(data.ReceiptId);
-  const avsResultCode = fe(data.AvsResultCode);
-  const cvdResultCode = fe(data.CvdResultCode);
-  const isVisa = fe(data.CardType, "V");
-  const isMasterCard = fe(data.CardType, "M");
-  const isVisaDebit = fe(data.IsVisaDebit, "true");
-  const code = fe(data.ResponseCode);
-  const authCode = fe(data.AuthCode);
-  const date = fe(data.TransDate);
-  const time = fe(data.TransTime);
-  const amount = fe(data.TransAmount);
-  const id = fe(data.TransID);
-  const type = fe(data.TransType);
-  const isComplete = fe(data.Complete, "true");
-  const payment = fe(data.PaymentType);
-  const resSuccess = fe(data.ResSuccess, "true");
-  const corporateCard = fe(data.CorporateCard, "true");
-  const recurSuccess = fe(data.RecurSuccess, "true");
-  const resolveData = fe(data.ResolveData);
-  const maskedPan = resolveData ? fe(resolveData.masked_pan) : null;
+  const output = {};
+
+  const addToOutput = (name, value, assertion) => {
+    const parsedValue = fe(value, assertion);
+
+    if (parsedValue && parsedValue !== "null") {
+      output[name] = parsedValue;
+    }
+  };
+
+  addToOutput("reference", data.ReferenceNum);
+  addToOutput("dataKey", data.DataKey);
+  addToOutput("iso", data.ISO);
+  addToOutput("receipt", data.ReceiptId);
+  addToOutput("avsResultCode", data.AvsResultCode);
+  addToOutput("cvdResultCode", data.CvdResultCode);
+  addToOutput("isVisa", data.CardType, "V");
+  addToOutput("isMasterCard", data.CardType, "M");
+  addToOutput("isVisaDebit", data.IsVisaDebit, "true");
+  addToOutput("authCode", data.AuthCode);
+  addToOutput("date", data.TransDate);
+  addToOutput("time", data.TransTime);
+  addToOutput("amount", data.TransAmount);
+  addToOutput("id", data.TransID);
+  addToOutput("type", data.TransType);
+  addToOutput("isComplete", data.Complete, "true");
+  addToOutput("payment", data.PaymentType);
+  addToOutput("resSuccess", data.ResSuccess, "true");
+  addToOutput("corporateCard", data.CorporateCard, "true");
+  addToOutput("recurSuccess", data.RecurSuccess, "true");
+  addToOutput("resolveData", data.ResolveData);
+  addToOutput("kountResult", data.KountResult);
+  addToOutput("kountScore", data.KountScore);
+  addToOutput("kountTransactionId", data.KountTransactionId);
+  addToOutput("preloadTicket", data.PreloadTicket);
+  addToOutput("cavv", data.Cavv);
+  addToOutput("challengeUrl", data.ChallengeURL);
+  addToOutput("challengeData", data.ChallengeData);
+  addToOutput("eci", data.ECI);
+  addToOutput("threeDSVersion", data.ThreeDSVersion);
+  addToOutput("threeDSServerTransId", data.ThreeDSServerTransId);
+
+  if (!sanitize) {
+    addToOutput(
+      "maskedPan",
+      data.ResolveData ? data.ResolveData.masked_pan : null
+    );
+  }
+
   const kountInfo = fe(data.KountInfo);
-  const kountResult = fe(data.KountResult);
-  const kountScore = fe(data.KountScore);
-  const kountTransactionId = fe(data.KountTransactionId);
-  const preloadTicket = fe(data.PreloadTicket);
-
-  if (reference && reference !== "null") {
-    o.reference = reference;
-  }
-  if (dataKey && dataKey !== "null") {
-    o.dataKey = dataKey;
-  }
-  if (iso && iso !== "null") {
-    o.iso = iso;
-  }
-  if (receipt && receipt !== "null") {
-    o.receipt = receipt;
-  }
-  if (avsResultCode) {
-    o.avsResultCode = avsResultCode;
-  }
-  if (cvdResultCode !== null && cvdResultCode !== "null") {
-    o.cvdResultCode = cvdResultCode;
-  }
-  if (isVisa !== null && isVisa !== "null") {
-    o.isVisa = isVisa;
-  }
-  if (isMasterCard !== null && isMasterCard !== "null") {
-    o.isMasterCard = isMasterCard;
-  }
-  if (isVisaDebit !== null && isVisaDebit !== "null") {
-    o.isVisaDebit = isVisaDebit;
-  }
-  if (authCode && authCode !== "null") {
-    o.authCode = authCode;
-  }
-  if (date && date !== "null") {
-    o.date = date;
-  }
-  if (time && time !== "null") {
-    o.time = time;
-  }
-  if (isComplete !== null && isComplete !== "null") {
-    o.isComplete = isComplete;
-  }
-  if (payment && payment !== "null") {
-    o.payment = payment;
-  }
-  if (resSuccess !== null && resSuccess !== "null") {
-    o.resSuccess = resSuccess;
-  }
-  if (recurSuccess !== null && recurSuccess !== "null") {
-    o.recurSuccess = recurSuccess;
-  }
-  if (corporateCard !== null && corporateCard !== "null") {
-    o.corporateCard = corporateCard;
-  }
-  if (amount && amount !== "null") {
-    o.amount = amount;
-  }
-  if (id && id !== "null") {
-    o.id = id;
-  }
-  if (type && type !== "null") {
-    o.type = type;
-  }
-  if (maskedPan && maskedPan !== "null" && !sanitize) {
-    o.maskedPan = maskedPan;
-  }
-
   if (kountInfo && kountInfo !== "null") {
-    o.kountInfo = Object.keys(kountInfo).reduce((total, current) => {
+    output.kountInfo = Object.keys(kountInfo).reduce((total, current) => {
       const newTotal = { ...total };
       newTotal[camelCase(current)] = kountInfo[current].pop();
       return newTotal;
     }, {});
   }
-  if (kountResult && kountResult !== "null") {
-    o.kountResult = kountResult;
-  }
-  if (kountScore && kountScore !== "null") {
-    o.kountScore = kountScore;
-  }
-  if (kountTransactionId && kountTransactionId !== "null") {
-    o.kountTransactionId = kountTransactionId;
-  }
 
-  // Apple Pay Preload Ticket
-  if (preloadTicket && preloadTicket !== "null") {
-    o.preloadTicket = preloadTicket;
-  }
+  const code = fe(data.ResponseCode);
 
   return {
     isSuccess:
       !fe(data.TimedOut, "true") &&
       (code === "00" || code ? parseInt(code, 10) < 50 : false),
     code,
-    msg: (o.timeout ? "TIMEOUT" : cleanse(fe(data.Message))) || "ERROR",
-    data: o,
+    msg: (output.timeout ? "TIMEOUT" : cleanse(fe(data.Message))) || "ERROR",
+    data: output,
   };
 };
 
@@ -285,6 +229,7 @@ const send = async (data, type, configuration) => {
     case "threeds_authentication":
       endpointPath = globals.MPI_2_FILE;
       rootName = "Mpi2Request";
+      break;
 
     default:
       endpointPath = globals.FILE;
@@ -324,12 +269,11 @@ const send = async (data, type, configuration) => {
   const response = await axios(options);
 
   // 5. Parse the response
-  const xmlify = xml.parseString(response.data);
-  const receipt = Array.isArray(xmlify.response.receipt)
-    ? xmlify.response.receipt[0]
-    : xmlify.response.receipt;
+  const xmlify = await xml.parseStringPromise(response.data);
+  const receipt = (xmlify.response || xmlify.Mpi2Response).receipt;
+  const normalizedReceipt = Array.isArray(receipt) ? receipt[0] : receipt;
 
-  return format(receipt, !sudo.has(type));
+  return format(normalizedReceipt, !sudo.has(type));
 };
 
 module.exports = {
