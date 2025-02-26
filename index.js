@@ -227,6 +227,7 @@ const send = async (data, type, configuration) => {
 
     case "card_lookup":
     case "threeds_authentication":
+    case "cavv_lookup":
       endpointPath = globals.MPI_2_FILE;
       rootName = "Mpi2Request";
       break;
@@ -320,4 +321,7 @@ module.exports = {
     send(data, "threeds_authentication", configuration),
   cavvPurchase: (data, configuration) =>
     send(data, "cavv_purchase", configuration),
+  cavvLookup: (data, configuration) => send(data, "cavv_lookup", configuration),
+  cavvVaultPurchase: (data, configuration) =>
+    send(data, "res_cavv_purchase_cc", configuration),
 };
