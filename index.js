@@ -1,300 +1,327 @@
-const xml = require('xml2js');
-const Promise = require('bluebird');
-const axios = require('axios');
-const { camelCase } = require('change-case');
+const xml = require("xml2js");
+const Promise = require("bluebird");
+const axios = require("axios");
+const { camelCase } = require("change-case");
 
 Promise.promisifyAll(xml);
 
-const globals = require('./constants/globals.json');
+const globals = require("./constants/globals.json");
 
 const xmlBuilder = new xml.Builder();
-xmlBuilder.options.rootName = 'request';
 
-let config = {
-  app_name: 'moneryze',
-  store_id: 'store5', // CVD & AVS only works with store5
-  api_token: 'yesguy',
-  crypt_type: '7',
-  test: true,
-};
-
-const filter = new Set(['res_lookup_masked', 'res_delete', 'completion', 'res_update_cc']);
-const sudo = new Set(['res_lookup_masked']);
+const filter = new Set([
+  "res_lookup_masked",
+  "res_delete",
+  "completion",
+  "res_update_cc",
+]);
+const sudo = new Set(["res_lookup_masked"]);
 
 const cleanse = (str, spaces) => {
   let s = str;
   if (spaces) {
-    s = String(s).split(' ').join('');
+    s = String(s).split(" ").join("");
   }
-  return (s ? String(s).split('/').join('').split('=')
-    .join('')
-    .split('*')
-    .join('')
-    .split('!')
-    .join('')
-    .split('-')
-    .join('')
-    .trim() : '')
-    .replace(/\s+/g, ' ');
+  return (
+    s
+      ? String(s)
+          .split("/")
+          .join("")
+          .split("=")
+          .join("")
+          .split("*")
+          .join("")
+          .split("!")
+          .join("")
+          .split("-")
+          .join("")
+          .trim()
+      : ""
+  ).replace(/\s+/g, " ");
 };
 
 /* eslint-disable-next-line no-nested-ternary */
-const fe = (arr, assertion) => (Array.isArray(arr) && arr.length > 0 && arr[0] !== 'null'
-      && arr[0] ? (assertion ? arr[0] === assertion : arr[0]) : null);
+const fe = (arr, assertion) =>
+  Array.isArray(arr) && arr.length > 0 && arr[0] !== "null" && arr[0]
+    ? assertion
+      ? arr[0] === assertion
+      : arr[0]
+    : null;
 
 const normalizeExpiry = (format, expiry) => {
-  if (typeof format === 'string' && format.toLowerCase().split('/').join('') === 'mmyy') {
-    return expiry.toString().split('').slice(2, 4).join('') + expiry.toString().split('').slice(0, 2).join('');
+  if (
+    typeof format === "string" &&
+    format.toLowerCase().split("/").join("") === "mmyy"
+  ) {
+    return (
+      expiry.toString().split("").slice(2, 4).join("") +
+      expiry.toString().split("").slice(0, 2).join("")
+    );
   }
   return expiry;
 };
 
 const format = (data, sanitize = true) => {
-  const o = {};
-  const reference = fe(data.ReferenceNum);
-  const dataKey = fe(data.DataKey);
-  const iso = fe(data.ISO);
-  const receipt = fe(data.ReceiptId);
-  const avsResultCode = fe(data.AvsResultCode);
-  const cvdResultCode = fe(data.CvdResultCode);
-  const isVisa = fe(data.CardType, 'V');
-  const isMasterCard = fe(data.CardType, 'M');
-  const isVisaDebit = fe(data.IsVisaDebit, 'true');
-  const code = fe(data.ResponseCode);
-  const authCode = fe(data.AuthCode);
-  const date = fe(data.TransDate);
-  const time = fe(data.TransTime);
-  const amount = fe(data.TransAmount);
-  const id = fe(data.TransID);
-  const type = fe(data.TransType);
-  const isComplete = fe(data.Complete, 'true');
-  const payment = fe(data.PaymentType);
-  const resSuccess = fe(data.ResSuccess, 'true');
-  const corporateCard = fe(data.CorporateCard, 'true');
-  const recurSuccess = fe(data.RecurSuccess, 'true');
-  const resolveData = fe(data.ResolveData);
-  const maskedPan = resolveData ? fe(resolveData.masked_pan) : null;
+  const output = {};
+
+  const addToOutput = (name, value, assertion) => {
+    const parsedValue = fe(value, assertion);
+
+    if (parsedValue && parsedValue !== "null") {
+      output[name] = parsedValue;
+    }
+  };
+
+  addToOutput("reference", data.ReferenceNum);
+  addToOutput("dataKey", data.DataKey);
+  addToOutput("iso", data.ISO);
+  addToOutput("receipt", data.ReceiptId);
+  addToOutput("avsResultCode", data.AvsResultCode);
+  addToOutput("cvdResultCode", data.CvdResultCode);
+  addToOutput("isVisa", data.CardType, "V");
+  addToOutput("isMasterCard", data.CardType, "M");
+  addToOutput("isVisaDebit", data.IsVisaDebit, "true");
+  addToOutput("authCode", data.AuthCode);
+  addToOutput("date", data.TransDate);
+  addToOutput("time", data.TransTime);
+  addToOutput("amount", data.TransAmount);
+  addToOutput("id", data.TransID);
+  addToOutput("type", data.TransType);
+  addToOutput("isComplete", data.Complete, "true");
+  addToOutput("payment", data.PaymentType);
+  addToOutput("resSuccess", data.ResSuccess, "true");
+  addToOutput("corporateCard", data.CorporateCard, "true");
+  addToOutput("recurSuccess", data.RecurSuccess, "true");
+  addToOutput("resolveData", data.ResolveData);
+  addToOutput("kountResult", data.KountResult);
+  addToOutput("kountScore", data.KountScore);
+  addToOutput("kountTransactionId", data.KountTransactionId);
+  addToOutput("preloadTicket", data.PreloadTicket);
+  addToOutput("cavv", data.Cavv);
+  addToOutput("challengeUrl", data.ChallengeURL);
+  addToOutput("challengeData", data.ChallengeData);
+  addToOutput("eci", data.ECI);
+  addToOutput("threeDSVersion", data.ThreeDSVersion);
+  addToOutput("threeDSServerTransId", data.ThreeDSServerTransId);
+
+  if (!sanitize) {
+    addToOutput(
+      "maskedPan",
+      data.ResolveData ? data.ResolveData.masked_pan : null
+    );
+  }
+
   const kountInfo = fe(data.KountInfo);
-  const kountResult = fe(data.KountResult);
-  const kountScore = fe(data.KountScore);
-  const kountTransactionId = fe(data.KountTransactionId);
-  const preloadTicket = fe(data.PreloadTicket);
-
-  if (reference && reference !== 'null') {
-    o.reference = reference;
-  }
-  if (dataKey && dataKey !== 'null') {
-    o.dataKey = dataKey;
-  }
-  if (iso && iso !== 'null') {
-    o.iso = iso;
-  }
-  if (receipt && receipt !== 'null') {
-    o.receipt = receipt;
-  }
-  if (avsResultCode) {
-    o.avsResultCode = avsResultCode;
-  }
-  if (cvdResultCode !== null && cvdResultCode !== 'null') {
-    o.cvdResultCode = cvdResultCode;
-  }
-  if (isVisa !== null && isVisa !== 'null') {
-    o.isVisa = isVisa;
-  }
-  if (isMasterCard !== null && isMasterCard !== 'null') {
-    o.isMasterCard = isMasterCard;
-  }
-  if (isVisaDebit !== null && isVisaDebit !== 'null') {
-    o.isVisaDebit = isVisaDebit;
-  }
-  if (authCode && authCode !== 'null') {
-    o.authCode = authCode;
-  }
-  if (date && date !== 'null') {
-    o.date = date;
-  }
-  if (time && time !== 'null') {
-    o.time = time;
-  }
-  if (isComplete !== null && isComplete !== 'null') {
-    o.isComplete = isComplete;
-  }
-  if (payment && payment !== 'null') {
-    o.payment = payment;
-  }
-  if (resSuccess !== null && resSuccess !== 'null') {
-    o.resSuccess = resSuccess;
-  }
-  if (recurSuccess !== null && recurSuccess !== 'null') {
-    o.recurSuccess = recurSuccess;
-  }
-  if (corporateCard !== null && corporateCard !== 'null') {
-    o.corporateCard = corporateCard;
-  }
-  if (amount && amount !== 'null') {
-    o.amount = amount;
-  }
-  if (id && id !== 'null') {
-    o.id = id;
-  }
-  if (type && type !== 'null') {
-    o.type = type;
-  }
-  if (maskedPan && maskedPan !== 'null' && !sanitize) {
-    o.maskedPan = maskedPan;
-  }
-
-  if (kountInfo && kountInfo !== 'null') {
-    o.kountInfo = Object.keys(kountInfo).reduce((total, current) => {
+  if (kountInfo && kountInfo !== "null") {
+    output.kountInfo = Object.keys(kountInfo).reduce((total, current) => {
       const newTotal = { ...total };
       newTotal[camelCase(current)] = kountInfo[current].pop();
       return newTotal;
     }, {});
   }
-  if (kountResult && kountResult !== 'null') {
-    o.kountResult = kountResult;
-  }
-  if (kountScore && kountScore !== 'null') {
-    o.kountScore = kountScore;
-  }
-  if (kountTransactionId && kountTransactionId !== 'null') {
-    o.kountTransactionId = kountTransactionId;
+
+  const code = fe(data.ResponseCode);
+
+  return {
+    isSuccess:
+      !fe(data.TimedOut, "true") &&
+      (code === "00" || code ? parseInt(code, 10) < 50 : false),
+    code,
+    msg: (output.timeout ? "TIMEOUT" : cleanse(fe(data.Message))) || "ERROR",
+    data: output,
+  };
+};
+
+const generateOrderId = (name) => {
+  const suffix = `${new Date().getTime()}-${Math.ceil(Math.random() * 10000)}`;
+  return `${cleanse(name, true)}-Transaction-${suffix}`;
+};
+
+const buildConfig = (configuration) => {
+  if (!configuration.store_id || !configuration.api_token) {
+    new Error("store_id and api_token are required.");
   }
 
-  // Apple Pay Preload Ticket
-  if (preloadTicket && preloadTicket !== 'null') {
-    o.preloadTicket = preloadTicket;
+  const countryCode = (configuration.country_code || "CA").toUpperCase();
+
+  if (countryCode !== "CA" && !globals[`${countryCode}_HOST`]) {
+    new Error("Invalid country code. CA, US is only supported.");
   }
 
   return {
-    isSuccess: !fe(data.TimedOut, 'true') && ((code) === '00' || code ? parseInt(code, 10) < 50 : false),
-    code,
-    msg: (o.timeout ? 'TIMEOUT' : cleanse(fe(data.Message))) || 'ERROR',
-    data: o,
+    ...configuration,
+    crypt_type: configuration.crypt_type || "7",
+    name: configuration.name || "default",
+    country_code: countryCode,
+    test: configuration.test || false,
   };
 };
 
 const send = async (data, type, configuration) => {
-  if (!configuration || !configuration.store_id || !configuration.api_token) {
-    return Promise.reject(new Error('configuration not initialized'));
+  const config = buildConfig(configuration);
+
+  if (!config || !config.store_id || !config.api_token) {
+    return Promise.reject(new Error("configuration not initialized"));
   }
-  const suffix = `${(new Date()).getTime()}-${Math.ceil(Math.random() * 10000)}`;
+
   const out = data;
+
+  // 1. Clean up the data
   if (!filter.has(type)) {
-    out.crypt_type = data.crypt_type || configuration.crypt_type;
-    out.order_id = out.order_id || `${cleanse(configuration.name, true)}-Purchase-${suffix}`;
+    out.crypt_type = data.crypt_type || config.crypt_type;
+    out.order_id = out.order_id || generateOrderId(config.name);
   }
-  if (configuration.test && out.test) {
-    out.amount = 0.05;
-    delete out.test;
-  }
+
   if (out.pan) {
     out.pan = cleanse(data.pan, true);
   }
+
   if (out.expdate) {
-    out.expdate = normalizeExpiry(configuration.expiryFormat, cleanse(data.expdate, true));
+    out.expdate = normalizeExpiry(
+      config.expiryFormat,
+      cleanse(data.expdate, true)
+    );
   }
+
   if (out.description) {
     out.dynamic_descriptor = out.description || out.dynamic_descriptor || type;
     delete out.description;
   }
+
   if (out.token) {
     out.data_key = out.token;
     delete out.token;
   }
+
   if (out.cvd_info) {
     out.cvd_info = out.cvd_info;
   }
+
   if (out.avs_info) {
     out.avs_info = out.avs_info;
   }
 
-  if (type === 'kount_inquiry') {
+  if (type === "kount_inquiry") {
     // default values for email and ANID when they weren't specified in payload
     if (!out.email) {
-      out.email = 'noemail@kount.com';
+      out.email = "noemail@kount.com";
     }
     if (!out.auto_number_id) {
-      out.auto_number_id = '0123456789';
+      out.auto_number_id = "0123456789";
     }
   }
 
+  // 2. Figure out the endpoint parameters
+  const countryCode = config.country_code === "US" ? `US_` : "";
+  const envCode = config.test === true ? "TEST_" : "";
+
+  let endpointPath;
+  let rootName;
+
+  switch (type) {
+    case "acs":
+    case "txn":
+      endpointPath = globals.MPI_FILE;
+      rootName = "request";
+      break;
+
+    case "card_lookup":
+    case "threeds_authentication":
+    case "cavv_lookup":
+      endpointPath = globals.MPI_2_FILE;
+      rootName = "Mpi2Request";
+      break;
+
+    default:
+      endpointPath = globals.FILE;
+      rootName = "request";
+      break;
+  }
+
+  // 3. Build the request
   const body = {
-    store_id: configuration.store_id,
-    api_token: configuration.api_token,
+    store_id: config.store_id,
+    api_token: config.api_token,
   };
-  if (type === 'attribute_query' || type === 'session_query') {
+
+  if (type === "attribute_query" || type === "session_query") {
     body.risk = {};
     body.risk[type] = out;
   } else {
     body[type] = out;
   }
-  let prefix = '';
-  if (!!configuration.country_code && config.country_code !== 'CA') {
-    prefix += `${config.country_code}_`;
-  }
-  let hostPrefix = prefix;
-  let filePrefix = prefix;
 
-  if (configuration.test !== undefined || configuration.test !== null) {
-    config.test = configuration.test;
-  }
-  if (config.test) {
-    hostPrefix += 'TEST_';
-  }
+  // 3.1 Convert to XML
+  xmlBuilder.options.rootName = rootName;
+  const xmlBody = xmlBuilder.buildObject(body);
 
-  if (type === 'acs' || type === 'txn') {
-    filePrefix += 'MPI_';
-  }
+  // 4. Send the request
+  const host = globals[`${countryCode}${envCode}HOST`];
   const options = {
-    url: `${globals.PROTOCOL}://${globals[`${hostPrefix}HOST`]}:${globals.PORT}${globals[`${filePrefix}FILE`]}`,
-    method: 'POST',
-    data: xmlBuilder.buildObject(body),
+    url: `${globals.PROTOCOL}://${host}:${globals.PORT}${endpointPath}`,
+    method: "POST",
+    data: xmlBody,
     headers: {
-      'USER-AGENT': globals.API_VERSION,
-      'CONTENT-TYPE': 'text/xml',
+      "USER-AGENT": globals.API_VERSION,
+      "CONTENT-TYPE": "text/xml",
     },
     timeout: globals.CLIENT_TIMEOUT * 1000,
   };
   const response = await axios(options);
-  const xmlify = await xml.parseStringAsync(response.data);
-  const receipt = Array.isArray(xmlify.response.receipt) ? xmlify.response.receipt[0] : xmlify.response.receipt;
-  return format(receipt, !sudo.has(type));
+
+  // 5. Parse the response
+  const xmlify = await xml.parseStringPromise(response.data);
+  const receipt = (xmlify.response || xmlify.Mpi2Response).receipt;
+  const normalizedReceipt = Array.isArray(receipt) ? receipt[0] : receipt;
+
+  return format(normalizedReceipt, !sudo.has(type));
 };
 
-module.exports.init = (configuration) => {
-  if (configuration.store_id && configuration.api_token) {
-    config = configuration;
-    if (!config.crypt_type) {
-      config.crypt_type = '7';
-    }
-    if (!config.name) {
-      config.name = 'default';
-    }
-    if (config.country_code) {
-      config.country_code = config.country_code.toUpperCase();
-      if (config.country_code !== 'CA'
-        && !Object.prototype.hasOwnProperty.call(globals, `${config.country_code}_HOST`)) {
-        return Promise.reject(new Error('Invalid country code. CA, US is only supported.'));
-      }
-    }
-    return Promise.resolve(config);
-  }
-  return Promise.reject(new Error('store_id and api_token are required.'));
-};
+module.exports = {
+  // Keep it for backward compatibility
+  init: () => Promise.resolve(),
 
-module.exports.resAddCC = (data, configuration = config) => send(data, 'res_add_cc', configuration);
-module.exports.resDelete = (data, configuration = config) => send(data, 'res_delete', configuration);
-module.exports.resUpdateCC = (data, configuration = config) => send(data, 'res_update_cc', configuration);
-module.exports.resPurchaseCC = (data, configuration = config) => send(data, 'res_purchase_cc', configuration);
-module.exports.resPreauthCC = (data, configuration = config) => send(data, 'res_preauth_cc', configuration);
-module.exports.resLookupMasked = (data, configuration = config) => send(data, 'res_lookup_masked', configuration);
-module.exports.completion = (data, configuration = config) => send(data, 'completion', configuration);
-module.exports.purchase = (data, configuration = config) => send(data, 'purchase', configuration);
-module.exports.refund = (data, configuration = config) => send(data, 'refund', configuration);
-module.exports.preauth = (data, configuration = config) => send(data, 'preauth', configuration);
-module.exports.independentRefundWithVault = (data, configuration = config) => send(data, 'res_ind_refund_cc', configuration);
-module.exports.kountInquire = (data, configuration = config) => send(data, 'kount_inquiry', configuration);
-module.exports.kountUpdate = (data, configuration = config) => send(data, 'kount_update', configuration);
-module.exports.resTokenizeCC = (data, configuration = config) => send(data, 'res_tokenize_cc', configuration);
-module.exports.applePayPreload = (data, configuration = config) => send(data, 'applepay_preload', configuration);
+  purchase: (data, configuration) => send(data, "purchase", configuration),
+  refund: (data, configuration) => send(data, "refund", configuration),
+
+  // Preauth
+  preauth: (data, configuration) => send(data, "preauth", configuration),
+  completion: (data, configuration) => send(data, "completion", configuration),
+
+  // Apple Pay
+  applePayPreload: (data, configuration) =>
+    send(data, "applepay_preload", configuration),
+
+  // Vault
+  resAddCC: (data, configuration) => send(data, "res_add_cc", configuration),
+  resDelete: (data, configuration) => send(data, "res_delete", configuration),
+  resUpdateCC: (data, configuration) =>
+    send(data, "res_update_cc", configuration),
+  resPurchaseCC: (data, configuration) =>
+    send(data, "res_purchase_cc", configuration),
+  resPreauthCC: (data, configuration) =>
+    send(data, "res_preauth_cc", configuration),
+  resLookupMasked: (data, configuration) =>
+    send(data, "res_lookup_masked", configuration),
+  independentRefundWithVault: (data, configuration) =>
+    send(data, "res_ind_refund_cc", configuration),
+  resTokenizeCC: (data, configuration) =>
+    send(data, "res_tokenize_cc", configuration),
+
+  // Kount
+  kountInquire: (data, configuration) =>
+    send(data, "kount_inquiry", configuration),
+  kountUpdate: (data, configuration) =>
+    send(data, "kount_update", configuration),
+
+  // 3DS
+  threedsCardLookup: (data, configuration) =>
+    send(data, "card_lookup", configuration),
+  threedsAuthentication: (data, configuration) =>
+    send(data, "threeds_authentication", configuration),
+  cavvPurchase: (data, configuration) =>
+    send(data, "cavv_purchase", configuration),
+  cavvLookup: (data, configuration) => send(data, "cavv_lookup", configuration),
+  cavvVaultPurchase: (data, configuration) =>
+    send(data, "res_cavv_purchase_cc", configuration),
+};
