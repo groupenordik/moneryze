@@ -103,6 +103,7 @@ const format = (data, sanitize = true) => {
   addToOutput("eci", data.ECI);
   addToOutput("threeDSVersion", data.ThreeDSVersion);
   addToOutput("threeDSServerTransId", data.ThreeDSServerTransId);
+  addToOutput("cardholderInfo", data.CardholderInfo);
 
   if (!sanitize) {
     addToOutput(
